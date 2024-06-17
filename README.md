@@ -1,4 +1,4 @@
-# Expert-level detection of pathologies from unannotated chest X-ray images via self-supervised learning
+
 ## Dependencies
 To clone all files:
 
