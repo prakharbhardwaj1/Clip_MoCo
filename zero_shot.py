@@ -10,9 +10,9 @@ from typing import List, Tuple
 
 import torch
 from torch.utils import data
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import torch.nn as nn
-from torchvision.transforms import Compose, Normalize, Resize, InterpolationMode
+from torchvision.transforms import Compose, Normalize, Resize, InterpolationMode, CenterCrop, RandomEqualize
 
 import sklearn
 from sklearn.metrics import confusion_matrix, accuracy_score, auc, roc_auc_score, roc_curve, classification_report
@@ -21,6 +21,11 @@ from sklearn.metrics import average_precision_score
 
 import clip
 from model import CLIP
+from mocomodel import CLIPMoCoWrapper
+from multicrop import CLIPMoCoWrapper
+from transformers import BertModel, BertTokenizer
+from simple_tokenizer import SimpleTokenizer
+from transformers import AutoTokenizer
 from eval import evaluate, plot_roc, accuracy, sigmoid, bootstrap, compute_cis
 
 CXR_FILEPATH = '../../project-files/data/test_cxr.h5'
@@ -62,6 +67,8 @@ class CXRTestDataset(data.Dataset):
     
         return sample
 
+
+
 def load_clip(model_path, pretrained=False, context_length=77): 
     """
     FUNCTION: load_clip
@@ -85,7 +92,10 @@ def load_clip(model_path, pretrained=False, context_length=77):
 
         model = CLIP(**params)
     else: 
-        model, preprocess = clip.load("ViT-B/32", device=device, jit=False) 
+        model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
+        print('pretrained')
+        model = CLIPMoCoWrapper(clip_model=model, embed_dim=512) 
+        print('mocomodel')
     try: 
         model.load_state_dict(torch.load(model_path, map_location=device))
     except: 
@@ -335,7 +345,7 @@ def make_true_labels(
         representing the binary ground truth labels for each pathology on each sample.
     """
     # create ground truth labels
-    full_labels = pd.read_csv(cxr_true_labels_path)
+    full_labels = pd.read_csv(cxr_true_labels_path, sep=',')
     if cutlabels: 
         full_labels = full_labels.loc[:, cxr_labels]
     else: 
@@ -377,13 +387,15 @@ def make(
     transformations = [
         # means computed from sample in `cxr_stats` notebook
         Normalize((101.48761, 101.48761, 101.48761), (83.43944, 83.43944, 83.43944)),
+        #CenterCrop(input_resolution),
+        #RandomEqualize(p=0.5),
     ]
     # if using CLIP pretrained model
     if pretrained: 
         # resize to input resolution of pretrained clip model
         input_resolution = 224
         transformations.append(Resize(input_resolution, interpolation=InterpolationMode.BICUBIC))
-    transform = Compose(transformations)
+        transform = Compose(transformations)
     
     # create dataset
     torch_dset = CXRTestDataset(
@@ -447,33 +459,6 @@ def ensemble_models(
     return predictions, y_pred_avg
 
 def run_zero_shot(cxr_labels, cxr_templates, model_path, cxr_filepath, final_label_path, alt_labels_dict: dict = None, softmax_eval = True, context_length=77, pretrained: bool = False, use_bootstrap=True, cutlabels=True): 
-    """
-    FUNCTION: run_zero_shot
-    --------------------------------------
-    This function is the main function to run the zero-shot pipeline given a dataset, 
-    labels, templates for those labels, ground truth labels, and config parameters.
-    
-    args: 
-        * cxr_labels - list
-            labels for a specific zero-shot task. (i.e. ['Atelectasis',...])
-            task can either be a string or a tuple (name of alternative label, name of label in csv)
-        * cxr_templates - list, phrases that will be indpendently tested as input to the clip model. If `softmax_eval` is True, this parameter should be a 
-        list of positive and negative template pairs stored as tuples. 
-        * model_path - String for directory to the weights of the trained clip model. 
-        * cxr_filepath - String for path to the chest x-ray images. 
-        * final_label_path - String for path to ground truth labels.
-
-        * alt_labels_dict (optional) - dict, map cxr_labels to list of alternative labels (i.e. 'Atelectasis': ['lung collapse', 'atelectatic lung', ...]) 
-        * softmax_eval (optional) - bool, if True, will evaluate results through softmax of pos vs. neg samples. 
-        * context_length (optional) - int, max number of tokens of text inputted into the model. 
-        * pretrained (optional) - bool, whether or not model uses pretrained clip weights
-        * use_bootstrap (optional) - bool, whether or not to use bootstrap sampling
-        * cutlabels (optional) - bool, if True, will keep columns of ground truth labels that correspond
-        with the labels inputted through `cxr_labels`. Otherwise, drop the first column and keep remaining. 
-    
-    Returns an array of results per template, each consists of a tuple containing a pandas dataframes 
-    for n bootstrap samples, and another pandas dataframe with the confidence intervals for each class.
-    """
     
     np.random.seed(97)
     # make the model, data loader, and ground truth labels
@@ -560,11 +545,3 @@ def validation_zero_shot(model_path, context_length=77, pretrained=False):
    
     results = run_zero_shot(cxr_sex_labels, cxr_sex_templates, model_path, cxr_filepath=cxr_filepath, final_label_path=sex_labels_path, softmax_eval=False, context_length=context_length, pretrained=True, use_bootstrap=True, cutlabels=False)
     pass
-
-
-    
-    
-    
-    
-    
- 
