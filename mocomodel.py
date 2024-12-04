@@ -22,7 +22,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cxr_filepath', type=str, default='data/cxr.h5', help="Directory to load chest x-ray image data from.")
     parser.add_argument('--txt_filepath', type=str, default='data/mimic_impressions.csv', help="Directory to load radiology report impressions text from.")
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=4)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--save_interval', type=int, default=1000)
@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--context_length', type=int, default=77)
     parser.add_argument('--random_init', action='store_true')
-    parser.add_argument('--model_name', type=str, default="moco-32_CLoss_run6")
+    parser.add_argument('--model_name', type=str, default="moco-32_batch64")
     parser.add_argument('--model_path', type=str, default=None, help="Path to the model checkpoint for loading pre-trained weights.")
     parser.add_argument('--moco_weight', type=float, default=1.0)
     # rest of your arguments
